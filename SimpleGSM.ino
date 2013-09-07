@@ -5,7 +5,7 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 unsigned char buffer[64]; // buffer array for data recieve over serial port
 int count=0;     // counter for buffer array 
 
-#define PWRPIN   2
+#define SoftPowerPin   2
 
 int lcd_key     = 0;
 int adc_key_in  = 0;
@@ -17,11 +17,8 @@ int adc_key_in  = 0;
 #define btnNONE   5
 
 volatile int Col=0,Row=0;
-
-
 volatile char LCDBuffer[16][50][1]; 
- 
-int dispRow;
+volatile int dispRow;
 
 
 
@@ -38,7 +35,7 @@ void setup()
   lcd.setCursor(0,1);
   lcd.print("Antonis Maglaras");
   delay(5000);
-  pinMode(PWRPIN, OUTPUT);
+  pinMode(SoftPowerPin, OUTPUT);
   // Open serial communications and wait for port to open:
   Serial.begin(19200);
   Serial.println("Power On");
@@ -57,7 +54,8 @@ void loop() // run over and over
    while(Serial1.available())          // reading data into char array 
    {
      buffer[count++]=Serial1.read();     // writing data into array
-     if(count == 64)break;
+     if (count == 64)
+       break;
    }
    Serial.write(buffer,count);            // if no data transmission ends, write buffer to hardware serial port
    clearBufferArray();              // call clearBufferArray function to clear the storaged data from the array
@@ -80,7 +78,7 @@ void loop() // run over and over
  {
    dispRow+=1;
    if (dispRow>Row)
-     dispRow=Row;
+     dispRow=Row-1;
    DisplayTextOnLCD();
    delay(150);
  }   
@@ -115,11 +113,15 @@ void clearBufferArray()              // function to clear buffer array
   { 
     if ((buffer[i]>=32) && (buffer[i]<127))
     {
-      if (Col==16)
+      if (Col>15)
       {
         Row++;
-        if (Row>50)
-          Row=1;
+        if (Row>48)
+        {
+          EmptyOneLineFromBuffer();
+          Row-=1;
+          Col=0;
+        }
         Col=0;
       }
       LCDBuffer[Col][Row][1]=buffer[i];
@@ -135,6 +137,12 @@ void clearBufferArray()              // function to clear buffer array
         if (twocrs)
         {
           Row++;
+          if (Row>48)
+          {
+            EmptyOneLineFromBuffer();
+            Row-=1;
+            Col=0;
+          }
           Col=0;
         }
       }
@@ -146,20 +154,20 @@ void clearBufferArray()              // function to clear buffer array
 
 void PowerUp()
 {
- digitalWrite(PWRPIN,LOW);
- delay(1000);
- digitalWrite(PWRPIN,HIGH);
+ digitalWrite(SoftPowerPin,LOW);
+ delay(100);
+ digitalWrite(SoftPowerPin,HIGH);
  delay(2000);
- digitalWrite(PWRPIN,LOW);
+ digitalWrite(SoftPowerPin,LOW);
 }
 
 void PowerDown()
 {
- digitalWrite(PWRPIN,LOW);
- delay(1000);
- digitalWrite(PWRPIN,HIGH);
+ digitalWrite(SoftPowerPin,LOW);
+ delay(100);
+ digitalWrite(SoftPowerPin,HIGH);
  delay(2000);
- digitalWrite(PWRPIN,LOW);
+ digitalWrite(SoftPowerPin,LOW);
 }
 
 
@@ -186,7 +194,7 @@ void DisplayTextOnLCD()
     for (int tCol=0; tCol<16; tCol++)
     {
       lcd.setCursor(tCol,tmp);
-      lcd.print(LCDBuffer[tCol][tmp+dispRow-1][1]);
+      lcd.print(LCDBuffer[tCol][tmp+dispRow][1]);
     }
 }
 
@@ -351,4 +359,23 @@ boolean Selection()
     return true;
   else
     return false;
+}
+
+void EmptyOneLineFromBuffer()
+{
+  for (int tRow=0; tRow<48; tRow++)
+  {
+    for (int tCol=0; tCol<16; tCol++)
+    {
+      LCDBuffer[tCol][tRow][1] = LCDBuffer[tCol][tRow+1][1];
+    }
+  }
+  for (int tCol=0; tCol<16; tCol++)
+  {
+    LCDBuffer[tCol][48][1]=32;
+    LCDBuffer[tCol][49][1]=32;
+  }
+  Row=48;
+  dispRow=47;
+  DisplayTextOnLCD();
 }
